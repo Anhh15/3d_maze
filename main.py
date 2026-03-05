@@ -8,7 +8,7 @@ main_tile_size = 50
 screen_w = 1538
 screen_h = 700
 
-maze_size = 4
+maze_size = 0
 
 class Player(pygame.sprite.Sprite):
     pass
@@ -79,6 +79,9 @@ play_buttom_text_surf = play_buttom_text_type.render('PLAY', False, "#CA0E0E")
 play_buttom_text_rect = play_buttom_text_surf.get_rect(center= (764, 250))
 
 # game state ------------------------------------------SETTING----------------------------------------------------
+setup_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 200)
+setup_text_surf = setup_text_type.render('0', False, '#000000')
+setup_text_rect = setup_text_surf.get_rect(center= (screen_w// 2, screen_h// 2))
 
 # game state ------------------------------------------IN_GAME----------------------------------------------------
 axes = ['XY', 'XZ', 'YZ']
@@ -117,32 +120,32 @@ while True:
                 if keys[pygame.K_8]: maze_size = maze_size* 10 + 8
                 if keys[pygame.K_9]: maze_size = maze_size* 10 + 9
                 if keys[pygame.K_0]: maze_size = maze_size* 10
-                print('a')
+
+                setup_text_surf = setup_text_type.render(str(maze_size), False, '#000000')
+                setup_text_rect = setup_text_surf.get_rect(center= (screen_w// 2, screen_h// 2))
+
+
+                if keys[pygame.K_RETURN]:
+                    maze = Maze3D(maze_size)
+                    maze.generate()
+
+                    player_pos = maze.start
+
+                    actual_size = maze.size 
+
+                    padding = 50
+                    main_available_h = screen_h - (padding * 2)
+                    main_tile_size = main_available_h // actual_size
                     
+                    main_offset_x = padding
+                    main_offset_y = (screen_h - (actual_size * main_tile_size)) // 2
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                maze = Maze3D(maze_size)
-                maze.generate()
-
-                player_pos = maze.start
-
-                actual_size = maze.size 
-
-                # 2. Cấu hình Main Maze (chiếm khoảng 80% chiều cao màn hình)
-                padding = 50
-                main_available_h = screen_h - (padding * 2)
-                main_tile_size = main_available_h // actual_size
-                
-                main_offset_x = padding
-                main_offset_y = (screen_h - (actual_size * main_tile_size)) // 2
-
-                # 3. Cấu hình Mini Map (xếp dọc bên phải)
-                mini_available_h = (screen_h - (padding * 3)) // 2 # Chia 2 khoảng cho 2 bản đồ phụ
-                mini_tile_size = mini_available_h // actual_size
-                
-                mini_offset_x = main_offset_x + (actual_size * main_tile_size) + padding
-                
-                game_state = 'in_game'
+                    mini_available_h = (screen_h - (padding * 3)) // 2
+                    mini_tile_size = mini_available_h // actual_size
+                    
+                    mini_offset_x = main_offset_x + (actual_size * main_tile_size) + padding
+                    
+                    game_state = 'in_game'
                 
         
         elif game_state == 'in_game':
@@ -197,6 +200,7 @@ while True:
     
     elif game_state == 'setting':
         screen.fill('#FFFFFF')
+        screen.blit(setup_text_surf, setup_text_rect)
 
     elif game_state == 'in_game':
         screen.fill('#FFFFFF')
