@@ -10,27 +10,30 @@ screen_h = 700
 
 maze_size = 0
 
-def draw_grid(surface, grid_slice, cell_size= main_tile_size, off_set_x= 0, off_set_y= 0, player_2d= None, start_2d= None, goal_2d= None):
+def render_maze_surface(grid_slice, cell_size):
     rows, cols = grid_slice.shape
+    surf = pygame.Surface((rows* cell_size, cols* cell_size))
     for r in range(rows):
         for c in range(cols):
-            x = off_set_x+ c*cell_size
-            y = off_set_y+ r*cell_size
+            x = c*cell_size
+            y = r*cell_size
 
             color = "#1A921C" if grid_slice[r, c] == 1 else "#5E510F"
-            pygame.draw.rect(surface, color, (x, y, cell_size, cell_size))
+            pygame.draw.rect(surf, color, (x, y, cell_size, cell_size))
+    return surf
 
-            if start_2d:
-                sx, sy = start_2d
-                pygame.draw.rect(surface, "#FF0000", (off_set_x+ sx* cell_size, off_set_y+ sy* cell_size, cell_size, cell_size))
+def draw_entities(surface, off_set_x, off_set_y, cell_size, start_2d, goal_2d, player_2d):
+    if start_2d:
+        sx, sy = start_2d
+        pygame.draw.rect(surface, "#FF0000", (off_set_x+ sx* cell_size, off_set_y+ sy* cell_size, cell_size, cell_size))
 
-            if goal_2d:
-                gx, gy = goal_2d
-                pygame.draw.rect(surface, "#FF00B7", (off_set_x+ gx* cell_size, off_set_y+ gy* cell_size, cell_size, cell_size))
+    if goal_2d:
+        gx, gy = goal_2d
+        pygame.draw.rect(surface, "#FF00B7", (off_set_x+ gx* cell_size, off_set_y+ gy* cell_size, cell_size, cell_size))
 
-            if player_2d:
-                px, py = player_2d
-                pygame.draw.rect(surface, '#000000', (off_set_x+ px* cell_size, off_set_y+ py* cell_size, cell_size, cell_size))
+    if player_2d:
+        px, py = player_2d
+        pygame.draw.rect(surface, '#000000', (off_set_x+ px* cell_size, off_set_y+ py* cell_size, cell_size, cell_size))
 
 def get_slice(maze, view_axis, player_position):
     px, py, pz = player_position
@@ -85,8 +88,13 @@ axes = ['XY', 'XZ', 'YZ']
 curr_axis_idx = 0
 axis = axes[curr_axis_idx]
 
-view_text_main_type = pygame.font.Font(r'font\Pixeltype.ttf', 100)
-view_text_minimap_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
+#cache
+maze_cache = {'XY': None, 'XZ': None, 'YZ': None}
+last_depth = {'XY': -1, 'XZ': -1, 'YZ': -1}
+
+# text info
+main_view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 100)
+mini_view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
 
 # game state
 game_state = 'menu'
@@ -135,7 +143,6 @@ while True:
                     maze.generate()
 
                     player_pos = maze.start
-                    print(player_pos)
 
                     actual_size = maze.size 
 
@@ -186,10 +193,12 @@ while True:
                 
                 nx, ny, nz = x + dx, y + dy, z + dz
                 
+                # move logic
                 if 0 <= nx < maze_size and 0 <= ny < maze_size and 0 <= nz < maze_size:
                     if maze.grid[nx, ny, nz] == 0:
                         player_pos = [nx, ny, nz]
                 
+                # win function
                 if (nx, ny, nz) == maze.goal:
                     print('win')
                     
@@ -215,29 +224,35 @@ while True:
         # background color
         screen.fill('#FFFFFF')
 
-        # draw main maze
-        grid_slice, p2d, s2d, g2d = get_slice(maze, axis, player_pos)
-        draw_grid(surface= screen, grid_slice= grid_slice, cell_size= main_tile_size, off_set_x= main_offset_x, off_set_y= main_offset_y,
-                   player_2d= p2d, start_2d= s2d, goal_2d= g2d)
-        view_text_main_surf = view_text_main_type.render(axis, False, '#000000')
-        view_text_main_rect = view_text_main_surf.get_rect(topleft= (main_offset_x, main_offset_y- 50))
-        screen.blit(view_text_main_surf, view_text_main_rect)
-
-
-        curr_mini_y = main_offset_y
-        # vẽ mini map
+        # load cache
         for ax in axes:
-            if ax == axis:
-                continue 
+            grid_slice, p2d, s2d, g2d = get_slice(maze, ax, player_pos)
+            curr_depth = player_pos[2] if ax == 'XY' else (player_pos[1] if ax == 'XZ' else player_pos[0])
 
-            sgrid_slice, sp2d, ss2d, sg2d = get_slice(maze, ax, player_pos)
-            draw_grid(surface= screen, grid_slice= sgrid_slice, cell_size= mini_tile_size, off_set_x= mini_offset_x,
-                      off_set_y= curr_mini_y, player_2d= sp2d, start_2d= ss2d, goal_2d= sg2d)
-            
-            view_text_surf = view_text_minimap_type.render(ax, False, '#000000')
-            view_text_rect = view_text_surf.get_rect(topleft= (mini_offset_x, curr_mini_y- 25))
-            screen.blit(view_text_surf, view_text_rect)
+            if maze_cache[ax] is None or last_depth != curr_depth:
+                cell_size = main_tile_size if ax == axis else mini_tile_size
+                maze_cache[ax] = render_maze_surface(grid_slice, cell_size)
+                last_depth[ax] = curr_depth
+        
+        # draw main
+        _, p2d, s2d, g2d = get_slice(maze, axis, player_pos)
+        screen.blit(maze_cache[axis], (main_offset_x, main_offset_y))
+        draw_entities(screen, main_offset_x, main_offset_y, main_tile_size, s2d, g2d, p2d)
 
-            curr_mini_y += (maze.size * mini_tile_size) + 55
+        # draw minimap
+        curr_mini_offset_y = main_offset_y
+        for ax in axes:
+            if ax == axis: continue
+
+            _, sp2d, ss2d, sg2d = get_slice(maze, ax, player_pos)
+            screen.blit(maze_cache[ax], (mini_offset_x, curr_mini_offset_y))
+            draw_entities(screen, mini_offset_x, curr_mini_offset_y, mini_tile_size, ss2d, sg2d, sp2d)
+
+            # change offset for other map
+            curr_mini_offset_y += (maze_size* mini_tile_size)+ 50
+
+            # display text
+
+
 
     pygame.display.flip()
