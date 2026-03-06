@@ -93,7 +93,7 @@ maze_cache = {'XY': None, 'XZ': None, 'YZ': None}
 last_depth = {'XY': -1, 'XZ': -1, 'YZ': -1}
 
 # text info
-main_view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 100)
+main_view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 60)
 mini_view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
 
 # game state
@@ -138,6 +138,8 @@ while True:
                         maze_size = 0
                         setup_text_surf = setup_text_type.render('0', False, '#000000')
                         continue
+                    # process even num
+                    if maze_size% 2 == 0: maze_size += 1
 
                     maze = Maze3D(maze_size)
                     maze.generate()
@@ -165,7 +167,13 @@ while True:
                 if event.key == pygame.K_SPACE:
                     curr_axis_idx = (curr_axis_idx+ 1)% 3
                     axis = axes[curr_axis_idx]
-            
+
+                # dev func --------------------------------------------------------------------------------------
+                if event.key == pygame.K_ESCAPE:
+                    game_state = 'menu'
+                    maze_size = 0
+                # dev func --------------------------------------------------------------------------------------
+
                 x, y, z = player_pos
                 dx, dy, dz = 0, 0, 0
                 axis = axes[curr_axis_idx]
@@ -234,10 +242,14 @@ while True:
                 maze_cache[ax] = render_maze_surface(grid_slice, cell_size)
                 last_depth[ax] = curr_depth
         
-        # draw main
+        # draw main view
         _, p2d, s2d, g2d = get_slice(maze, axis, player_pos)
         screen.blit(maze_cache[axis], (main_offset_x, main_offset_y))
         draw_entities(screen, main_offset_x, main_offset_y, main_tile_size, s2d, g2d, p2d)
+        # display main text
+        main_view_text_surf = main_view_text_type.render(axis, False, '#000000')
+        main_view_text_rect = main_view_text_surf.get_rect(topleft= (main_offset_x, main_offset_y- 30))
+        screen.blit(main_view_text_surf, main_view_text_rect)
 
         # draw minimap
         curr_mini_offset_y = main_offset_y
@@ -248,11 +260,13 @@ while True:
             screen.blit(maze_cache[ax], (mini_offset_x, curr_mini_offset_y))
             draw_entities(screen, mini_offset_x, curr_mini_offset_y, mini_tile_size, ss2d, sg2d, sp2d)
 
-            # change offset for other map
-            curr_mini_offset_y += (maze_size* mini_tile_size)+ 50
-
             # display text
+            mini_view_text_surf = mini_view_text_type.render(ax, False, '#000000')
+            mini_view_text_rect = mini_view_text_surf.get_rect(topleft= (mini_offset_x, curr_mini_offset_y- 25))
+            screen.blit(mini_view_text_surf, mini_view_text_rect)
 
+            # change offset for other map
+            curr_mini_offset_y = curr_mini_offset_y +(maze_size* mini_tile_size)+ 60
 
 
     pygame.display.flip()
