@@ -10,9 +10,6 @@ screen_h = 700
 
 maze_size = 0
 
-class Player(pygame.sprite.Sprite):
-    pass
-
 def draw_grid(surface, grid_slice, cell_size= main_tile_size, off_set_x= 0, off_set_y= 0, player_2d= None, start_2d= None, goal_2d= None):
     rows, cols = grid_slice.shape
     for r in range(rows):
@@ -25,7 +22,7 @@ def draw_grid(surface, grid_slice, cell_size= main_tile_size, off_set_x= 0, off_
 
             if start_2d:
                 sx, sy = start_2d
-                pygame.draw.rect(surface, '#FF0000', (off_set_x+ sx* cell_size, off_set_y+ sy* cell_size, cell_size, cell_size))
+                pygame.draw.rect(surface, "#FF0000", (off_set_x+ sx* cell_size, off_set_y+ sy* cell_size, cell_size, cell_size))
 
             if goal_2d:
                 gx, gy = goal_2d
@@ -88,7 +85,8 @@ axes = ['XY', 'XZ', 'YZ']
 curr_axis_idx = 0
 axis = axes[curr_axis_idx]
 
-view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
+view_text_main_type = pygame.font.Font(r'font\Pixeltype.ttf', 100)
+view_text_minimap_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
 
 # game state
 game_state = 'menu'
@@ -111,25 +109,33 @@ while True:
             if event.type == pygame.KEYDOWN:
                 keys = pygame.key.get_pressed()
                 if keys[pygame.K_1]: maze_size = maze_size* 10 + 1
-                if keys[pygame.K_2]: maze_size = maze_size* 10 + 2
-                if keys[pygame.K_3]: maze_size = maze_size* 10 + 3
-                if keys[pygame.K_4]: maze_size = maze_size* 10 + 4
-                if keys[pygame.K_5]: maze_size = maze_size* 10 + 5
-                if keys[pygame.K_6]: maze_size = maze_size* 10 + 6
-                if keys[pygame.K_7]: maze_size = maze_size* 10 + 7
-                if keys[pygame.K_8]: maze_size = maze_size* 10 + 8
-                if keys[pygame.K_9]: maze_size = maze_size* 10 + 9
-                if keys[pygame.K_0]: maze_size = maze_size* 10
+                elif keys[pygame.K_2]: maze_size = maze_size* 10 + 2
+                elif keys[pygame.K_3]: maze_size = maze_size* 10 + 3
+                elif keys[pygame.K_4]: maze_size = maze_size* 10 + 4
+                elif keys[pygame.K_5]: maze_size = maze_size* 10 + 5
+                elif keys[pygame.K_6]: maze_size = maze_size* 10 + 6
+                elif keys[pygame.K_7]: maze_size = maze_size* 10 + 7
+                elif keys[pygame.K_8]: maze_size = maze_size* 10 + 8
+                elif keys[pygame.K_9]: maze_size = maze_size* 10 + 9
+                elif keys[pygame.K_0]: maze_size = maze_size* 10
+
+                if maze_size > 20:
+                    maze_size //= 10
 
                 setup_text_surf = setup_text_type.render(str(maze_size), False, '#000000')
                 setup_text_rect = setup_text_surf.get_rect(center= (screen_w// 2, screen_h// 2))
 
-
                 if keys[pygame.K_RETURN]:
+                    if maze_size < 4 or maze_size > 20:
+                        maze_size = 0
+                        setup_text_surf = setup_text_type.render('0', False, '#000000')
+                        continue
+
                     maze = Maze3D(maze_size)
                     maze.generate()
 
                     player_pos = maze.start
+                    print(player_pos)
 
                     actual_size = maze.size 
 
@@ -146,7 +152,6 @@ while True:
                     mini_offset_x = main_offset_x + (actual_size * main_tile_size) + padding
                     
                     game_state = 'in_game'
-                
         
         elif game_state == 'in_game':
             if event.type == pygame.KEYDOWN:
@@ -181,14 +186,16 @@ while True:
                 
                 nx, ny, nz = x + dx, y + dy, z + dz
                 
-                # Check bounds and wall
                 if 0 <= nx < maze_size and 0 <= ny < maze_size and 0 <= nz < maze_size:
                     if maze.grid[nx, ny, nz] == 0:
                         player_pos = [nx, ny, nz]
                 
                 if (nx, ny, nz) == maze.goal:
                     print('win')
+                    
                     game_state = 'menu'
+                    setup_text_surf = setup_text_type.render('0', False, '#000000')
+                    maze_size = 0
     
     if game_state == 'menu':
         # background color
@@ -199,14 +206,23 @@ while True:
         screen.blit(play_buttom_text_surf, play_buttom_text_rect)
     
     elif game_state == 'setting':
+        # background color
         screen.fill('#FFFFFF')
+        # maze size custom
         screen.blit(setup_text_surf, setup_text_rect)
 
     elif game_state == 'in_game':
+        # background color
         screen.fill('#FFFFFF')
+
+        # draw main maze
         grid_slice, p2d, s2d, g2d = get_slice(maze, axis, player_pos)
         draw_grid(surface= screen, grid_slice= grid_slice, cell_size= main_tile_size, off_set_x= main_offset_x, off_set_y= main_offset_y,
                    player_2d= p2d, start_2d= s2d, goal_2d= g2d)
+        view_text_main_surf = view_text_main_type.render(axis, False, '#000000')
+        view_text_main_rect = view_text_main_surf.get_rect(topleft= (main_offset_x, main_offset_y- 50))
+        screen.blit(view_text_main_surf, view_text_main_rect)
+
 
         curr_mini_y = main_offset_y
         # vẽ mini map
@@ -218,7 +234,7 @@ while True:
             draw_grid(surface= screen, grid_slice= sgrid_slice, cell_size= mini_tile_size, off_set_x= mini_offset_x,
                       off_set_y= curr_mini_y, player_2d= sp2d, start_2d= ss2d, goal_2d= sg2d)
             
-            view_text_surf = view_text_type.render(ax, False, '#000000')
+            view_text_surf = view_text_minimap_type.render(ax, False, '#000000')
             view_text_rect = view_text_surf.get_rect(topleft= (mini_offset_x, curr_mini_y- 25))
             screen.blit(view_text_surf, view_text_rect)
 

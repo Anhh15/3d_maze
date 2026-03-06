@@ -52,9 +52,3 @@ class Maze3D:
         if len(path_way) < 2: return
         self.start = tuple(path_way[0])
         self.goal = tuple(path_way[-1])
-
-
-# maze = Maze3D(6)
-# maze.generate()
-
-# print(maze.grid)
