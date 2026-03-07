@@ -1,6 +1,8 @@
 import pygame
 from maze_generator import Maze3D
 from sys import exit
+import csv
+from pathlib import Path
 
 # Cấu hình
 main_tile_size = 50
@@ -8,6 +10,8 @@ main_tile_size = 50
 screen_w = 1538
 screen_h = 700
 
+maze_min_size = 4
+maze_max_size = 20
 maze_size = 0
 
 def render_maze_surface(grid_slice, cell_size):
@@ -60,7 +64,36 @@ def get_slice(maze, view_axis, player_position):
         g2d = (gy, gz) if gx == px else None
         s2d = (sy, sz) if sx == px else None
         return grid_slice.T, p2d, s2d, g2d
+
+def save_highscore(maze_size, time_taken):
+    path = Path('highscore.csv')
+    fieldnames = ['size', 'time']
+    rows = []
+
+    if not path.exists():
+        for size in range(maze_min_size, maze_max_size+ 1):
+            if size% 2 == 0: continue
+            rows.append({'size': str(size), 'time': "0"})
+    else:
+        with open(path, 'r', newline= '') as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+    update = False
+    for row in rows:
+        if row['size'] == str(maze_size):
+            current_time = float(row['time'])
+            if current_time < 0 or current_time > time_taken:
+                row['time'] = time_taken
+                update = True
+            break
     
+    if update or not path.exists():
+        with open(path, 'w', newline= '') as f:
+            writer = csv.DictWriter(f, fieldnames= fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+            
 pygame.init()
 
 # screen
@@ -72,11 +105,23 @@ text_type = pygame.font.Font(r'font\Pixeltype.ttf', 100)
 text_surf = text_type.render('3D MAZE', False, '#000000')
 text_rect = text_surf.get_rect(center = (764, 150))
 
-# buttom
-play_buttom_rect = pygame.Rect(764, 250, 200, 100)
+# play buttom
+play_buttom_pos = (screen_w// 2, screen_h// 2- 60)
+play_buttom_color = '#000000'
+play_buttom_rect = pygame.Rect(0, 0, 200, 100)
+play_buttom_rect.center = play_buttom_pos
 play_buttom_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
 play_buttom_text_surf = play_buttom_text_type.render('PLAY', False, "#CA0E0E")
-play_buttom_text_rect = play_buttom_text_surf.get_rect(center= (764, 250))
+play_buttom_text_rect = play_buttom_text_surf.get_rect(center= play_buttom_pos)
+
+# scoreboard buttom
+highboard_buttom_pos = (screen_w// 2, screen_h// 2+ 60)
+highboard_buttom_color = '#000000'
+highboard_buttom_rect = pygame.Rect(0, 0, 200, 100)
+highboard_buttom_rect.center = highboard_buttom_pos
+highboard_buttom_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
+highboard_buttom_text_surf = highboard_buttom_text_type.render('HIGHBOARD', False, "#CA0E0E")
+highboard_buttom_text_rect = highboard_buttom_text_surf.get_rect(center= highboard_buttom_pos)
 
 # game state ------------------------------------------SETTING----------------------------------------------------
 setup_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 200)
@@ -98,6 +143,9 @@ mini_view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
 
 # game state
 game_state = 'menu'
+
+# clock
+clock = pygame.time.Clock()
 
 while True:
     for event in pygame.event.get():
@@ -143,6 +191,8 @@ while True:
 
                     maze = Maze3D(maze_size)
                     maze.generate()
+
+                    start_time = pygame.time.get_ticks()
 
                     player_pos = maze.start
 
@@ -209,26 +259,38 @@ while True:
                 # win function
                 if (nx, ny, nz) == maze.goal:
                     print('win')
+
+                    # calculate time
+                    finish_time = pygame.time.get_ticks()- start_time
+                    save_highscore(maze_size, finish_time)
                     
+                    # reset setup
                     game_state = 'menu'
                     setup_text_surf = setup_text_type.render('0', False, '#000000')
                     maze_size = 0
     
-    if game_state == 'menu':
+    if game_state == 'menu': #--------------------------------------------------------------------------------
         # background color
         screen.fill("#FFFFFF")
+
         # game name text
         screen.blit(text_surf, text_rect)
-        pygame.draw.rect(screen, '#000000', rect= play_buttom_rect)
+
+        # play buttom display
+        pygame.draw.rect(screen, play_buttom_color, rect= play_buttom_rect)
         screen.blit(play_buttom_text_surf, play_buttom_text_rect)
+        
+        # highboard buttom display
+        pygame.draw.rect(screen, highboard_buttom_color, rect= highboard_buttom_rect)
+        screen.blit(highboard_buttom_text_surf, highboard_buttom_text_rect)
     
-    elif game_state == 'setting':
+    elif game_state == 'setting':#--------------------------------------------------------------------------------
         # background color
         screen.fill('#FFFFFF')
         # maze size custom
         screen.blit(setup_text_surf, setup_text_rect)
 
-    elif game_state == 'in_game':
+    elif game_state == 'in_game':#--------------------------------------------------------------------------------
         # background color
         screen.fill('#FFFFFF')
 
@@ -246,6 +308,7 @@ while True:
         _, p2d, s2d, g2d = get_slice(maze, axis, player_pos)
         screen.blit(maze_cache[axis], (main_offset_x, main_offset_y))
         draw_entities(screen, main_offset_x, main_offset_y, main_tile_size, s2d, g2d, p2d)
+        
         # display main text
         main_view_text_surf = main_view_text_type.render(axis, False, '#000000')
         main_view_text_rect = main_view_text_surf.get_rect(topleft= (main_offset_x, main_offset_y- 30))
@@ -267,6 +330,5 @@ while True:
 
             # change offset for other map
             curr_mini_offset_y = curr_mini_offset_y +(maze_size* mini_tile_size)+ 60
-
 
     pygame.display.flip()
