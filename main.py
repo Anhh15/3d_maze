@@ -4,7 +4,7 @@ from sys import exit
 import csv
 from pathlib import Path
 
-# Cấu hình
+# biến chung
 main_tile_size = 50
 
 screen_w = 1538
@@ -13,6 +13,8 @@ screen_h = 700
 maze_min_size = 4
 maze_max_size = 20
 maze_size = 0
+
+highscore_fieldnames = ['size', 'time']
 
 def render_maze_surface(grid_slice, cell_size):
     rows, cols = grid_slice.shape
@@ -65,9 +67,8 @@ def get_slice(maze, view_axis, player_position):
         s2d = (sy, sz) if sx == px else None
         return grid_slice.T, p2d, s2d, g2d
 
-def save_highscore(maze_size, time_taken):
+def save_record(maze_size, time_taken):
     path = Path('highscore.csv')
-    fieldnames = ['size', 'time']
     rows = []
 
     if not path.exists():
@@ -83,17 +84,28 @@ def save_highscore(maze_size, time_taken):
     for row in rows:
         if row['size'] == str(maze_size):
             current_time = float(row['time'])
-            if current_time < 0 or current_time > time_taken:
+            if current_time <= 0 or current_time > time_taken:
                 row['time'] = time_taken
                 update = True
             break
     
     if update or not path.exists():
         with open(path, 'w', newline= '') as f:
-            writer = csv.DictWriter(f, fieldnames= fieldnames)
+            writer = csv.DictWriter(f, fieldnames= highscore_fieldnames)
             writer.writeheader()
             writer.writerows(rows)
-            
+
+def get_current_record(maze_size):
+    path = Path('highscore.csv')
+
+    if not path.exists(): return 0.0
+
+    with open(path, 'r', newline= '') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row['size'] == str(maze_size):
+                return float(row['time'])
+    
 pygame.init()
 
 # screen
@@ -140,6 +152,10 @@ last_depth = {'XY': -1, 'XZ': -1, 'YZ': -1}
 # text info
 main_view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 60)
 mini_view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
+
+# game state ------------------------------------------ENDING----------------------------------------------------
+end_mess_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 100)
+
 
 # game state
 game_state = 'menu'
@@ -253,22 +269,32 @@ while True:
                 
                 # move logic
                 if 0 <= nx < maze_size and 0 <= ny < maze_size and 0 <= nz < maze_size:
-                    if maze.grid[nx, ny, nz] == 0:
-                        player_pos = [nx, ny, nz]
+                    # if maze.grid[nx, ny, nz] == 0:
+                    player_pos = [nx, ny, nz]
                 
                 # win function
                 if (nx, ny, nz) == maze.goal:
                     print('win')
 
-                    # calculate time
+                    # calculate time and save record
                     finish_time = pygame.time.get_ticks()- start_time
-                    save_highscore(maze_size, finish_time)
+                    old_highscore = get_current_record(maze_size)
+
+                    is_new_highscore = (old_highscore <= 0 or old_highscore > finish_time)
                     
+                    if is_new_highscore: save_record(maze_size, finish_time)
+
                     # reset setup
-                    game_state = 'menu'
+                    game_state = 'ending'
+
                     setup_text_surf = setup_text_type.render('0', False, '#000000')
                     maze_size = 0
     
+        elif game_state == 'ending':
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    game_state = 'menu'
+
     if game_state == 'menu': #--------------------------------------------------------------------------------
         # background color
         screen.fill("#FFFFFF")
@@ -330,5 +356,20 @@ while True:
 
             # change offset for other map
             curr_mini_offset_y = curr_mini_offset_y +(maze_size* mini_tile_size)+ 60
+
+    elif game_state == 'ending':#--------------------------------------------------------------------------------
+        # background color
+        screen.fill('#FFFFFF')
+
+        if not is_new_highscore:
+            end_mess_text_surf = end_mess_text_type.render(f'YOUR SCORE: {finish_time}', False, '#000000')
+            end_mess_text_rect = end_mess_text_surf.get_rect(center= (screen_w// 2, screen_h// 2))
+        else:
+            end_mess_text_surf = end_mess_text_type.render(f'NEW HIGHSCORE: {finish_time}', False, '#000000')
+            end_mess_text_rect = end_mess_text_surf.get_rect(center= (screen_w// 2, screen_h// 2))
+    
+        screen.blit(end_mess_text_surf, end_mess_text_rect)
+
+
 
     pygame.display.flip()
