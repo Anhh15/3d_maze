@@ -72,7 +72,7 @@ def save_record(maze_size, time_taken):
     rows = []
 
     if not path.exists():
-        for size in range(maze_min_size, maze_max_size+ 1):
+        for size in range(maze_min_size, maze_max_size+ 2):
             if size% 2 == 0: continue
             rows.append({'size': str(size), 'time': "0"})
     else:
@@ -127,13 +127,13 @@ play_buttom_text_surf = play_buttom_text_type.render('PLAY', False, "#CA0E0E")
 play_buttom_text_rect = play_buttom_text_surf.get_rect(center= play_buttom_pos)
 
 # scoreboard buttom
-highboard_buttom_pos = (screen_w// 2, screen_h// 2+ 60)
-highboard_buttom_color = '#000000'
-highboard_buttom_rect = pygame.Rect(0, 0, 200, 100)
-highboard_buttom_rect.center = highboard_buttom_pos
-highboard_buttom_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
-highboard_buttom_text_surf = highboard_buttom_text_type.render('HIGHBOARD', False, "#CA0E0E")
-highboard_buttom_text_rect = highboard_buttom_text_surf.get_rect(center= highboard_buttom_pos)
+scoreboard_buttom_pos = (screen_w// 2, screen_h// 2+ 60)
+scoreboard_buttom_color = '#000000'
+scoreboard_buttom_rect = pygame.Rect(0, 0, 200, 100)
+scoreboard_buttom_rect.center = scoreboard_buttom_pos
+scoreboard_buttom_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
+scoreboard_buttom_text_surf = scoreboard_buttom_text_type.render('SCOREBOARD', False, "#CA0E0E")
+scoreboard_buttom_text_rect = scoreboard_buttom_text_surf.get_rect(center= scoreboard_buttom_pos)
 
 # game state ------------------------------------------SETTING----------------------------------------------------
 setup_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 200)
@@ -156,6 +156,12 @@ mini_view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
 # game state ------------------------------------------ENDING----------------------------------------------------
 end_mess_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 100)
 
+# game state ------------------------------------------SCOREBOARD----------------------------------------------------
+scoreboard_title_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 100)
+scoreboard_content_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 40)
+
+current_open_file = False
+
 
 # game state
 game_state = 'menu'
@@ -172,10 +178,11 @@ while True:
         if game_state == 'menu':
             if event.type == pygame.MOUSEBUTTONUP:
                 if play_buttom_rect.collidepoint(event.pos):
-
-                    maze_size = 0
-
+                    maze_size = 0 
                     game_state = 'setting'
+
+                elif scoreboard_buttom_rect.collidepoint(event.pos):
+                    game_state = 'scoreboard'
         
         elif game_state == 'setting':
             if event.type == pygame.KEYDOWN:
@@ -190,6 +197,7 @@ while True:
                 elif keys[pygame.K_8]: maze_size = maze_size* 10 + 8
                 elif keys[pygame.K_9]: maze_size = maze_size* 10 + 9
                 elif keys[pygame.K_0]: maze_size = maze_size* 10
+                elif keys[pygame.K_BACKSPACE]: maze_size = 0
 
                 if maze_size > 20:
                     maze_size //= 10
@@ -294,6 +302,12 @@ while True:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     game_state = 'menu'
+        
+        elif game_state == 'scoreboard':
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    current_open_file = False
+                    game_state = 'menu'
 
     if game_state == 'menu': #--------------------------------------------------------------------------------
         # background color
@@ -306,9 +320,9 @@ while True:
         pygame.draw.rect(screen, play_buttom_color, rect= play_buttom_rect)
         screen.blit(play_buttom_text_surf, play_buttom_text_rect)
         
-        # highboard buttom display
-        pygame.draw.rect(screen, highboard_buttom_color, rect= highboard_buttom_rect)
-        screen.blit(highboard_buttom_text_surf, highboard_buttom_text_rect)
+        # scoreboard buttom display
+        pygame.draw.rect(screen, scoreboard_buttom_color, rect= scoreboard_buttom_rect)
+        screen.blit(scoreboard_buttom_text_surf, scoreboard_buttom_text_rect)
     
     elif game_state == 'setting':#--------------------------------------------------------------------------------
         # background color
@@ -361,15 +375,54 @@ while True:
         # background color
         screen.fill('#FFFFFF')
 
+        # highscore display
         if not is_new_highscore:
-            end_mess_text_surf = end_mess_text_type.render(f'YOUR SCORE: {finish_time}', False, '#000000')
-            end_mess_text_rect = end_mess_text_surf.get_rect(center= (screen_w// 2, screen_h// 2))
+            end_highscore_text_surf = end_mess_text_type.render(f'HIGHSCORE: {old_highscore}', False, '#000000')
+            end_highscore_text_rect = end_highscore_text_surf.get_rect(center= (screen_w// 2, screen_h// 2- 25))
+            screen.blit(end_highscore_text_surf, end_highscore_text_rect)
+
+            end_score_text_surf = end_mess_text_type.render(f'YOUR SCORE: {finish_time}', False, '#000000')
+            end_score_text_rect = end_score_text_surf.get_rect(center= (screen_w// 2, screen_h// 2+ 25))
+            screen.blit(end_score_text_surf, end_score_text_rect)
         else:
             end_mess_text_surf = end_mess_text_type.render(f'NEW HIGHSCORE: {finish_time}', False, '#000000')
             end_mess_text_rect = end_mess_text_surf.get_rect(center= (screen_w// 2, screen_h// 2))
-    
-        screen.blit(end_mess_text_surf, end_mess_text_rect)
+            screen.blit(end_mess_text_surf, end_mess_text_rect)
 
+    elif game_state == 'scoreboard':
+        
+        if current_open_file == False:
+            highscore_rows = []
+            path = Path('highscore.csv')
+            if not path.exists():
+                rows = []
+                for size in range(maze_min_size, maze_max_size+ 1):
+                    if size% 2 == 0: continue
+                    rows.append({'size': str(size), 'time': "0"})
 
+                with open(path, 'w', newline= '') as f:
+                    writer = csv.DictWriter(f, fieldnames= highscore_fieldnames)
+                    writer.writeheader()
+                    writer.writerows(rows)
+            
+            with open(path, 'r', newline= '') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    highscore_rows.append(f'{row['size']} : {row['time']}')
+
+            current_open_file = True
+        
+        screen.fill('#FFFFFF')
+        start_line = 120
+        line_high = 50
+        scoreboard_title_text_surf = scoreboard_title_text_type.render('size : time', False, '#000000')
+        scoreboard_title_text_rect = scoreboard_title_text_surf.get_rect(center= (screen_w// 2, start_line- line_high- 20))
+        screen.blit(scoreboard_title_text_surf, scoreboard_title_text_rect)
+        for i, row in enumerate(highscore_rows):
+            scoreboard_content_text_surf = scoreboard_title_text_type.render(row, False, '#000000')
+            scoreboard_content_text_rect = scoreboard_content_text_surf.get_rect(center = (screen_w// 2, start_line+ line_high* i))
+
+            screen.blit(scoreboard_content_text_surf, scoreboard_content_text_rect)
+        
 
     pygame.display.flip()
