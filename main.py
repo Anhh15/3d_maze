@@ -6,42 +6,14 @@ from pathlib import Path
 
 from gizmo_3d import Gizmo3D
 
+from renderer import GameRenderer
+from setting import *
+
+
 # biến chung
-main_tile_size = 50
-
-screen_w = 1538
-screen_h = 700
-
-maze_min_size = 4
-maze_max_size = 20
 maze_size = 0
 
 highscore_fieldnames = ['size', 'time']
-
-def render_maze_surface(grid_slice, cell_size):
-    rows, cols = grid_slice.shape
-    surf = pygame.Surface((rows* cell_size, cols* cell_size))
-    for r in range(rows):
-        for c in range(cols):
-            x = c*cell_size
-            y = r*cell_size
-
-            color = "#1A921C" if grid_slice[r, c] == 1 else "#5E510F"
-            pygame.draw.rect(surf, color, (x, y, cell_size, cell_size))
-    return surf
-
-def draw_entities(surface, off_set_x, off_set_y, cell_size, start_2d, goal_2d, player_2d):
-    if start_2d:
-        sx, sy = start_2d
-        pygame.draw.rect(surface, "#FF0000", (off_set_x+ sx* cell_size, off_set_y+ sy* cell_size, cell_size, cell_size))
-
-    if goal_2d:
-        gx, gy = goal_2d
-        pygame.draw.rect(surface, "#FF00B7", (off_set_x+ gx* cell_size, off_set_y+ gy* cell_size, cell_size, cell_size))
-
-    if player_2d:
-        px, py = player_2d
-        pygame.draw.rect(surface, '#000000', (off_set_x+ px* cell_size, off_set_y+ py* cell_size, cell_size, cell_size))
 
 def get_slice(maze, view_axis, player_position):
     px, py, pz = player_position
@@ -70,11 +42,11 @@ def get_slice(maze, view_axis, player_position):
         return grid_slice.T, p2d, s2d, g2d
 
 def save_record(maze_size, time_taken):
-    path = Path('highscore.csv')
+    path = Path(HIGHSCORE_FILE)
     rows = []
 
     if not path.exists():
-        for size in range(maze_min_size, maze_max_size+ 2):
+        for size in range(MAZE_MIN_SIZE, MAZE_MAX_SIZE+ 3):
             if size% 2 == 0: continue
             rows.append({'size': str(size), 'time': "0"})
     else:
@@ -98,7 +70,7 @@ def save_record(maze_size, time_taken):
             writer.writerows(rows)
 
 def get_current_record(maze_size):
-    path = Path('highscore.csv')
+    path = Path(HIGHSCORE_FILE)
 
     if not path.exists(): return 0.0
 
@@ -107,64 +79,29 @@ def get_current_record(maze_size):
         for row in reader:
             if row['size'] == str(maze_size):
                 return float(row['time'])
+    return 0
     
 pygame.init()
-gizmo = Gizmo3D(x=1250, y=350, size=150)
-
-# screen
-screen = pygame.display.set_mode((screen_w, screen_h))
+gizmo = Gizmo3D(*(GIZMO_POS), GIZMO_SIZE)
+renderer = GameRenderer()
 
 # game state ------------------------------------------MENU----------------------------------------------------
-# game name text
-text_type = pygame.font.Font(r'font\Pixeltype.ttf', 100) 
-text_surf = text_type.render('3D MAZE', False, '#000000')
-text_rect = text_surf.get_rect(center = (764, 150))
-
-# play buttom
-play_buttom_pos = (screen_w// 2, screen_h// 2- 60)
-play_buttom_color = '#000000'
-play_buttom_rect = pygame.Rect(0, 0, 200, 100)
-play_buttom_rect.center = play_buttom_pos
-play_buttom_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
-play_buttom_text_surf = play_buttom_text_type.render('PLAY', False, "#CA0E0E")
-play_buttom_text_rect = play_buttom_text_surf.get_rect(center= play_buttom_pos)
-
-# scoreboard buttom
-scoreboard_buttom_pos = (screen_w// 2, screen_h// 2+ 60)
-scoreboard_buttom_color = '#000000'
-scoreboard_buttom_rect = pygame.Rect(0, 0, 200, 100)
-scoreboard_buttom_rect.center = scoreboard_buttom_pos
-scoreboard_buttom_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
-scoreboard_buttom_text_surf = scoreboard_buttom_text_type.render('SCOREBOARD', False, "#CA0E0E")
-scoreboard_buttom_text_rect = scoreboard_buttom_text_surf.get_rect(center= scoreboard_buttom_pos)
 
 # game state ------------------------------------------SETTING----------------------------------------------------
-setup_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 200)
-setup_text_surf = setup_text_type.render('0', False, '#000000')
-setup_text_rect = setup_text_surf.get_rect(center= (screen_w// 2, screen_h// 2))
 
 # game state ------------------------------------------IN_GAME----------------------------------------------------
 axes = ['XY', 'XZ', 'YZ']
 curr_axis_idx = 0
 axis = axes[curr_axis_idx]
 
-#cache
-maze_cache = {'XY': None, 'XZ': None, 'YZ': None}
-last_depth = {'XY': -1, 'XZ': -1, 'YZ': -1}
-
-# text info
-main_view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 60)
-mini_view_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 50)
+# 3d map state
+open_3d_map = False
 
 # game state ------------------------------------------ENDING----------------------------------------------------
-end_mess_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 100)
 
 # game state ------------------------------------------SCOREBOARD----------------------------------------------------
-scoreboard_title_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 100)
-scoreboard_content_text_type = pygame.font.Font(r'font\Pixeltype.ttf', 40)
 
 current_open_file = False
-
 
 # game state
 game_state = 'menu'
@@ -180,11 +117,11 @@ while True:
         
         if game_state == 'menu':
             if event.type == pygame.MOUSEBUTTONUP:
-                if play_buttom_rect.collidepoint(event.pos):
+                if renderer.play_buttom_rect.collidepoint(event.pos):
                     maze_size = 0 
                     game_state = 'setting'
 
-                elif scoreboard_buttom_rect.collidepoint(event.pos):
+                elif renderer.score_buttom_rect.collidepoint(event.pos):
                     game_state = 'scoreboard'
         
         elif game_state == 'setting':
@@ -207,13 +144,9 @@ while True:
                 if maze_size > 20:
                     maze_size //= 10
 
-                setup_text_surf = setup_text_type.render(str(maze_size), False, '#000000')
-                setup_text_rect = setup_text_surf.get_rect(center= (screen_w// 2, screen_h// 2))
-
                 if keys[pygame.K_RETURN]:
                     if maze_size < 4 or maze_size > 20:
                         maze_size = 0
-                        setup_text_surf = setup_text_type.render('0', False, '#000000')
                         continue
                     # process even num
                     if maze_size% 2 == 0: maze_size += 1
@@ -224,31 +157,19 @@ while True:
                     start_time = pygame.time.get_ticks()
 
                     player_pos = maze.start
-
-                    actual_size = maze.size 
-
-                    padding = 50
-                    main_available_h = screen_h - (padding * 2)
-                    main_tile_size = main_available_h // actual_size
-                    
-                    main_offset_x = padding
-                    main_offset_y = (screen_h - (actual_size * main_tile_size)) // 2
-
-                    mini_available_h = (screen_h - (padding * 3)) // 2
-                    mini_tile_size = mini_available_h // actual_size
-                    
-                    mini_offset_x = main_offset_x + (actual_size * main_tile_size) + padding
                     
                     game_state = 'in_game'
         
         elif game_state == 'in_game':
 
-            gizmo.process_event(event) # Thêm dòng này
+            gizmo.process_event(event)
             
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     curr_axis_idx = (curr_axis_idx+ 1)% 3
                     axis = axes[curr_axis_idx]
+                elif event.key == pygame.K_m:
+                    open_3d_map = not open_3d_map
 
                 # dev func --------------------------------------------------------------------------------------
                 if event.key == pygame.K_ESCAPE:
@@ -302,13 +223,11 @@ while True:
 
                     # reset setup
                     game_state = 'ending'
-
-                    setup_text_surf = setup_text_type.render('0', False, '#000000')
-                    maze_size = 0
     
         elif game_state == 'ending':
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
+                    maze_size = 0
                     game_state = 'menu'
         
         elif game_state == 'scoreboard':
@@ -318,96 +237,25 @@ while True:
                     game_state = 'menu'
 
     if game_state == 'menu': #--------------------------------------------------------------------------------
-        # background color
-        screen.fill("#FFFFFF")
-
-        # game name text
-        screen.blit(text_surf, text_rect)
-
-        # play buttom display
-        pygame.draw.rect(screen, play_buttom_color, rect= play_buttom_rect)
-        screen.blit(play_buttom_text_surf, play_buttom_text_rect)
-        
-        # scoreboard buttom display
-        pygame.draw.rect(screen, scoreboard_buttom_color, rect= scoreboard_buttom_rect)
-        screen.blit(scoreboard_buttom_text_surf, scoreboard_buttom_text_rect)
+        renderer.draw_menu()
     
     elif game_state == 'setting':#--------------------------------------------------------------------------------
-        # background color
-        screen.fill('#FFFFFF')
-        # maze size custom
-        screen.blit(setup_text_surf, setup_text_rect)
+        renderer.draw_setting(maze_size)
 
     elif game_state == 'in_game':#--------------------------------------------------------------------------------
-        # background color
-        screen.fill('#FFFFFF')
-
-        # load cache
-        for ax in axes:
-            grid_slice, p2d, s2d, g2d = get_slice(maze, ax, player_pos)
-            curr_depth = player_pos[2] if ax == 'XY' else (player_pos[1] if ax == 'XZ' else player_pos[0])
-
-            if maze_cache[ax] is None or last_depth != curr_depth:
-                cell_size = main_tile_size if ax == axis else mini_tile_size
-                maze_cache[ax] = render_maze_surface(grid_slice, cell_size)
-                last_depth[ax] = curr_depth
-        
-        # draw main view
-        grid_slice_main, p2d, s2d, g2d = get_slice(maze, axis, player_pos)
-        screen.blit(maze_cache[axis], (main_offset_x, main_offset_y))
-        draw_entities(screen, main_offset_x, main_offset_y, main_tile_size, s2d, g2d, p2d)
-        
-        # display main text
-        main_view_text_surf = main_view_text_type.render(axis, False, '#000000')
-        main_view_text_rect = main_view_text_surf.get_rect(topleft= (main_offset_x, main_offset_y- 30))
-        screen.blit(main_view_text_surf, main_view_text_rect)
-
-        # draw minimap
-        curr_mini_offset_y = main_offset_y
-        for ax in axes:
-            if ax == axis: continue
-
-            _, sp2d, ss2d, sg2d = get_slice(maze, ax, player_pos)
-            screen.blit(maze_cache[ax], (mini_offset_x, curr_mini_offset_y))
-            draw_entities(screen, mini_offset_x, curr_mini_offset_y, mini_tile_size, ss2d, sg2d, sp2d)
-
-            # display text
-            mini_view_text_surf = mini_view_text_type.render(ax, False, '#000000')
-            mini_view_text_rect = mini_view_text_surf.get_rect(topleft= (mini_offset_x, curr_mini_offset_y- 25))
-            screen.blit(mini_view_text_surf, mini_view_text_rect)
-
-            # change offset for other map
-            curr_mini_offset_y = curr_mini_offset_y +(maze_size* mini_tile_size)+ 60
-
-        # Thêm 2 dòng này để lấy dữ liệu mặt cắt và vẽ
-        gizmo.draw(screen, axis, player_pos, maze_size, grid_slice_main)
+        renderer.draw_in_game(maze, axis, player_pos, get_slice, gizmo)
 
     elif game_state == 'ending':#--------------------------------------------------------------------------------
-        # background color
-        screen.fill('#FFFFFF')
+        current_record = get_current_record(maze_size)
+        renderer.draw_ending(is_new_highscore, current_record, finish_time)
 
-        # highscore display
-        if not is_new_highscore:
-            end_highscore_text_surf = end_mess_text_type.render(f'HIGHSCORE: {old_highscore}', False, '#000000')
-            end_highscore_text_rect = end_highscore_text_surf.get_rect(center= (screen_w// 2, screen_h// 2- 25))
-            screen.blit(end_highscore_text_surf, end_highscore_text_rect)
-
-            end_score_text_surf = end_mess_text_type.render(f'YOUR SCORE: {finish_time}', False, '#000000')
-            end_score_text_rect = end_score_text_surf.get_rect(center= (screen_w// 2, screen_h// 2+ 25))
-            screen.blit(end_score_text_surf, end_score_text_rect)
-        else:
-            end_mess_text_surf = end_mess_text_type.render(f'NEW HIGHSCORE: {finish_time}', False, '#000000')
-            end_mess_text_rect = end_mess_text_surf.get_rect(center= (screen_w// 2, screen_h// 2))
-            screen.blit(end_mess_text_surf, end_mess_text_rect)
-
-    elif game_state == 'scoreboard':
-        
+    elif game_state == 'scoreboard': 
         if current_open_file == False:
             highscore_rows = []
-            path = Path('highscore.csv')
+            path = Path(HIGHSCORE_FILE)
             if not path.exists():
                 rows = []
-                for size in range(maze_min_size, maze_max_size+ 1):
+                for size in range(MAZE_MIN_SIZE, MAZE_MAX_SIZE+ 3):
                     if size% 2 == 0: continue
                     rows.append({'size': str(size), 'time': "0"})
 
@@ -423,17 +271,6 @@ while True:
 
             current_open_file = True
         
-        screen.fill('#FFFFFF')
-        start_line = 120
-        line_high = 50
-        scoreboard_title_text_surf = scoreboard_title_text_type.render('size : time', False, '#000000')
-        scoreboard_title_text_rect = scoreboard_title_text_surf.get_rect(center= (screen_w// 2, start_line- line_high- 20))
-        screen.blit(scoreboard_title_text_surf, scoreboard_title_text_rect)
-        for i, row in enumerate(highscore_rows):
-            scoreboard_content_text_surf = scoreboard_title_text_type.render(row, False, '#000000')
-            scoreboard_content_text_rect = scoreboard_content_text_surf.get_rect(center = (screen_w// 2, start_line+ line_high* i))
-
-            screen.blit(scoreboard_content_text_surf, scoreboard_content_text_rect)
+        renderer.draw_scoreboard(highscore_rows)
         
-
     pygame.display.flip()
