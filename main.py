@@ -4,6 +4,8 @@ from sys import exit
 import csv
 from pathlib import Path
 
+from gizmo_3d import Gizmo3D
+
 # biến chung
 main_tile_size = 50
 
@@ -107,6 +109,7 @@ def get_current_record(maze_size):
                 return float(row['time'])
     
 pygame.init()
+gizmo = Gizmo3D(x=1250, y=350, size=150)
 
 # screen
 screen = pygame.display.set_mode((screen_w, screen_h))
@@ -199,6 +202,8 @@ while True:
                 elif keys[pygame.K_0]: maze_size = maze_size* 10
                 elif keys[pygame.K_BACKSPACE]: maze_size = 0
 
+                elif keys[pygame.K_ESCAPE]: game_state = 'menu'
+
                 if maze_size > 20:
                     maze_size //= 10
 
@@ -237,6 +242,9 @@ while True:
                     game_state = 'in_game'
         
         elif game_state == 'in_game':
+
+            gizmo.process_event(event) # Thêm dòng này
+            
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     curr_axis_idx = (curr_axis_idx+ 1)% 3
@@ -277,8 +285,8 @@ while True:
                 
                 # move logic
                 if 0 <= nx < maze_size and 0 <= ny < maze_size and 0 <= nz < maze_size:
-                    # if maze.grid[nx, ny, nz] == 0:
-                    player_pos = [nx, ny, nz]
+                    if maze.grid[nx, ny, nz] == 0:
+                        player_pos = [nx, ny, nz]
                 
                 # win function
                 if (nx, ny, nz) == maze.goal:
@@ -305,7 +313,7 @@ while True:
         
         elif game_state == 'scoreboard':
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_SPACE or event.key == pygame.K_ESCAPE:
                     current_open_file = False
                     game_state = 'menu'
 
@@ -345,7 +353,7 @@ while True:
                 last_depth[ax] = curr_depth
         
         # draw main view
-        _, p2d, s2d, g2d = get_slice(maze, axis, player_pos)
+        grid_slice_main, p2d, s2d, g2d = get_slice(maze, axis, player_pos)
         screen.blit(maze_cache[axis], (main_offset_x, main_offset_y))
         draw_entities(screen, main_offset_x, main_offset_y, main_tile_size, s2d, g2d, p2d)
         
@@ -370,6 +378,9 @@ while True:
 
             # change offset for other map
             curr_mini_offset_y = curr_mini_offset_y +(maze_size* mini_tile_size)+ 60
+
+        # Thêm 2 dòng này để lấy dữ liệu mặt cắt và vẽ
+        gizmo.draw(screen, axis, player_pos, maze_size, grid_slice_main)
 
     elif game_state == 'ending':#--------------------------------------------------------------------------------
         # background color
